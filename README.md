@@ -1,3 +1,5 @@
+[![Build Status](https://drone.friedl.net/api/badges/playground/suckless-quark/status.svg)](https://drone.friedl.net/playground/suckless-quark)
+
 This is my private tree of [quark](tools.suckless.org/quark/). Upstream can be
 found at https://git.suckless.org/quark.
 
