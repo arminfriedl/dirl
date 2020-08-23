@@ -1,4 +1,4 @@
-.Dd 2019-02-24
+.Dd 2020-08-23
 .Dt QUARK 1
 .Os suckless.org
 .Sh NAME
@@ -30,6 +30,15 @@
 .Sh DESCRIPTION
 .Nm
 is a simple HTTP GET/HEAD-only web server for static content.
+It supports virtual hosts (see
+.Fl v ) ,
+explicit redirects (see
+.Fl m ) ,
+directory listings (see
+.Fl l ) ,
+conditional "If-Modified-Since"-requests (RFC 7232), range requests
+(RFC 7233) and well-known URIs (RFC 8615), while refusing to serve
+hidden files and directories.
 .Sh OPTIONS
 .Bl -tag -width Ds
 .It Fl d Ar dir
@@ -46,6 +55,7 @@ The default is "nogroup".
 Use
 .Ar host
 as the server hostname.
+The default is the loopback interface (i.e. localhost).
 .It Fl i Ar file
 Set
 .Ar file
@@ -54,7 +64,7 @@ The default is "index.html".
 .It Fl l
 Enable directory listing.
 .It Fl m Ar map
-Add the target prefix mapping rule specified by
+Add the URI prefix mapping rule specified by
 .Ar map ,
 which has the form
 .Qq Pa from to [chost] ,
@@ -63,7 +73,7 @@ escaped with '\\'.
 .Pp
 The prefix
 .Pa from
-of all matching targets is replaced with
+of all matching URIs is replaced with
 .Pa to ,
 optionally limited to the canonical virtual host
 .Pa chost .
@@ -108,7 +118,7 @@ is redirected to the canonical host
 .Pa chost ,
 if they differ, using the directory
 .Pa dir
-as the root directory, optionally prefixing the target with
+as the root directory, optionally prefixing the URI with
 .Pa prefix .
 If any virtual hosts are specified, all requests on non-matching
 hosts are discarded.
