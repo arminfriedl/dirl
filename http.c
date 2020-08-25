@@ -61,7 +61,7 @@ const char *res_field_str[] = {
 enum status
 http_send_header(int fd, const struct response *res)
 {
-	char t[FIELD_MAX], esc[PATH_MAX];
+	char t[FIELD_MAX];
 	size_t i;
 
 	if (timestamp(t, sizeof(t), time(NULL))) {
@@ -87,18 +87,6 @@ http_send_header(int fd, const struct response *res)
 
 	if (dprintf(fd, "\r\n") < 0) {
 		return S_REQUEST_TIMEOUT;
-	}
-
-	/* listing header */
-	if (res->type == RESTYPE_DIRLISTING) {
-		html_escape(res->uri, esc, sizeof(esc));
-		if (dprintf(fd,
-		            "<!DOCTYPE html>\n<html>\n\t<head>"
-		            "<title>Index of %s</title></head>\n"
-		            "\t<body>\n\t\t<a href=\"..\">..</a>",
-		            esc) < 0) {
-			return S_REQUEST_TIMEOUT;
-		}
 	}
 
 	return res->status;

@@ -10,6 +10,7 @@
 #include "http.h"
 #include "resp.h"
 #include "util.h"
+#include "dirl.h"
 
 static int
 compareent(const struct dirent **d1, const struct dirent **d2)
@@ -23,19 +24,6 @@ compareent(const struct dirent **d1, const struct dirent **d2)
 	}
 
 	return strcmp((*d1)->d_name, (*d2)->d_name);
-}
-
-static char *
-suffix(int t)
-{
-	switch (t) {
-	case DT_FIFO: return "|";
-	case DT_DIR:  return "/";
-	case DT_LNK:  return "@";
-	case DT_SOCK: return "=";
-	}
-
-	return "";
 }
 
 enum status
@@ -52,30 +40,34 @@ resp_dir(int fd, const struct response *res)
 		return S_FORBIDDEN;
 	}
 
-	/* listing */
+  /* listing header */
+  if ((ret = dirl_header(fd, res))) {
+    return ret;
+  }
+
+	/* entries */
 	for (i = 0; i < (size_t)dirlen; i++) {
 		/* skip hidden files, "." and ".." */
 		if (e[i]->d_name[0] == '.') {
 			continue;
 		}
 
-		/* entry line */
-		html_escape(e[i]->d_name, esc, sizeof(esc));
-		if (dprintf(fd, "<br />\n\t\t<a href=\"%s%s\">%s%s</a>",
-		            esc,
-		            (e[i]->d_type == DT_DIR) ? "/" : "",
-		            esc,
-		            suffix(e[i]->d_type)) < 0) {
-			ret = S_REQUEST_TIMEOUT;
-			goto cleanup;
-		}
+    /*  skip dirl special files */
+    if(dirl_skip(e[i]->d_name)) {
+      continue;
+    }
+
+    /* entry line */
+    if ((ret = dirl_entry(fd, e[i]))) {
+      goto cleanup;
+    }
+
 	}
 
-	/* listing footer */
-	if (dprintf(fd, "\n\t</body>\n</html>\n") < 0) {
-		ret = S_REQUEST_TIMEOUT;
-		goto cleanup;
-	}
+  /* listing footer */
+  if ((ret = dirl_footer(fd))) {
+    goto cleanup;
+  }
 
 cleanup:
 	while (dirlen--) {

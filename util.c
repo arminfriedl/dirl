@@ -168,6 +168,42 @@ html_escape(const char *src, char *dst, size_t dst_siz)
 	dst[j] = '\0';
 }
 
+char*
+replace(const char *src, const char *old, const char* new) {
+  int old_len = strlen(old);
+  int new_len = strlen(new);
+  int src_len = strlen(src);
+
+  /* Count needed replacements */
+  const char* tmp = src;
+  int replc=0;
+  while ((tmp=strstr(tmp, old))) {
+    replc++;
+    tmp += old_len;
+  }
+
+  /* Allocate enough space for the new string */
+  char *buf = malloc( (sizeof(char)*src_len) + (sizeof(char)*replc*(new_len-old_len)) + 1);
+
+  /* Now start replacing */
+  const char *srcidx = src;
+  const char *srcidx_old = src;
+  char *bufidx = buf;
+
+  while (replc--) {
+    srcidx_old = strstr(srcidx, old);
+
+    bufidx = strncpy(bufidx, srcidx, srcidx_old - srcidx) + (srcidx_old-srcidx);
+    bufidx = strcpy(bufidx, new) + new_len;
+
+    srcidx = srcidx_old+old_len;
+  }
+
+  strcpy(bufidx, srcidx); // copy tail
+
+  return buf;
+}
+
 #define	INVALID  1
 #define	TOOSMALL 2
 #define	TOOLARGE 3

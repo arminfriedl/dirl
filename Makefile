@@ -4,14 +4,15 @@
 
 include config.mk
 
-COMPONENTS = util sock http resp
+COMPONENTS = util sock http resp dirl
 
 all: quark
 
 util.o: util.c util.h config.mk
 sock.o: sock.c sock.h util.h config.mk
 http.o: http.c http.h util.h http.h resp.h config.h config.mk
-resp.o: resp.c resp.h util.h http.h config.mk
+resp.o: resp.c resp.h util.h http.h dirl.h config.mk
+dirl.o: dirl.c dirl.h util.h http.h config.mk
 main.o: main.c util.h sock.h http.h arg.h config.h config.mk
 
 quark: $(COMPONENTS:=.o) $(COMPONENTS:=.h) main.o config.mk
