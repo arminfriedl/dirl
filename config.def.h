@@ -1,9 +1,5 @@
 #define HEADER_MAX 4096
 #define FIELD_MAX  200
-#define DIRL_HEADER "header.qhtml"
-#define DIRL_ENTRY  "entry.qhtml"
-#define DIRL_FOOTER "footer.qhtml"
-#define DIRL_STYLE  "dirlist.css"
 
 /* mime-types */
 static const struct {

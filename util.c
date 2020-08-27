@@ -199,7 +199,7 @@ replace(const char *src, const char *old, const char* new) {
     srcidx = srcidx_old+old_len;
   }
 
-  strcpy(bufidx, srcidx); // copy tail
+  strncpy(bufidx, srcidx, strlen(srcidx)); // copy tail
 
   return buf;
 }

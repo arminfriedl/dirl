@@ -8,6 +8,11 @@
 
 #include "http.h"
 
+#define DIRL_HEADER ".header.tpl"
+#define DIRL_ENTRY  ".entry.tpl"
+#define DIRL_FOOTER ".footer.tpl"
+#define DIRL_STYLE  "style.css"
+
 struct dirl_env_entry {
   char *name;
   char *value;
@@ -22,6 +27,7 @@ struct dirl_env {
  * meaning. Skips header-, entry-, footer templates and dirlist style css.
  */
 int dirl_skip(const char*);
+
 enum status dirl_header(int, const struct response*);
 enum status dirl_entry(int, const struct dirent*);
 enum status dirl_footer(int);

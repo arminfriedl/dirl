@@ -12,8 +12,8 @@ steps:
   image: debian
   commands:
     - cp quark /usr/local/bin
-    - useradd web && su web && cd
-    - mkdir -p web && cd web && echo "hello from quark" > index.html 
+    - useradd web
+    - mkdir -p web && cd web && echo "hello from quark" > index.html
     - quark -p 9130 -h run -l -u web -g web
   detach: true
 
