@@ -1,5 +1,6 @@
 /* See LICENSE file for copyright and license details. */
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,25 +32,13 @@ suffix(int t)
 }
 
 static char*
-dirl_read_template(char* tpl)
+dirl_read(char* tpl)
 {
-  /* Try find template in root (note that we are chroot'ed) */
   FILE* tpl_fp;
-  char* tpl_abs;
 
-  tpl_abs = calloc(strlen(tpl)+2, sizeof(char));
-  if(tpl_abs == NULL) {
+  if (!(tpl_fp = fopen(tpl, "r"))) {
     return NULL;
   }
-  tpl_abs[0] = '/';
-  strcat(tpl_abs, tpl);
-
-  if (!(tpl_fp = fopen(tpl_abs, "r"))) {
-    free(tpl_abs);
-    return NULL;
-  }
-
-  free(tpl_abs);
 
   /* Get size of template */
   if (fseek(tpl_fp, 0L, SEEK_END) < 0) {
@@ -66,7 +55,7 @@ dirl_read_template(char* tpl)
   rewind(tpl_fp);
 
   /* Read template into tpl_buf */
-  char* tpl_buf = (char*)malloc(sizeof(char) * tpl_size);
+  char* tpl_buf = (char*)calloc(sizeof(char), tpl_size);
 
   if (tpl_buf == NULL) {
     fclose(tpl_fp);
@@ -91,119 +80,120 @@ dirl_read_template(char* tpl)
   return tpl_buf;
 }
 
-static enum status
-dirl_header_default(int fd, const struct response* res)
+/* Try to find templates up until root
+ *
+ * Iterates the directory hierarchy upwards. Returns the closest path containing
+ * a template file or NULL if none could be found.
+ *
+ * Note that we are chrooted.
+ */
+static char*
+dirl_find_templ_dir(const char* start_path)
 {
-  char esc[PATH_MAX];
-  html_escape(res->uri, esc, sizeof(esc));
-  if (dprintf(fd,
-              "<!DOCTYPE html>\n"
-              "<html>\n"
-              "  <head>\n"
-              "    <link rel=\"stylesheet\" href=\"/"DIRL_STYLE"\">\n"
-              "    <title>Index of %s</title>\n"
-              "  </head>\n"
-              "  <body>\n"
-              "    <h1>Index of %s</h1>\n"
-              "    <a href=\"..\">..</a>",
-              esc,
-              esc) < 0) {
-    return S_REQUEST_TIMEOUT;
+  char* path_buf = calloc(sizeof(char), strlen(start_path));
+  strcat(path_buf, start_path);
+
+  while (strlen(path_buf) != 0) {
+    DIR* cur = opendir(path_buf);
+    struct dirent* de;
+    errno = 0;
+    while ((de = readdir(cur))) {
+      if (de->d_type == DT_REG) {
+        if (strcmp(DIRL_HEADER, de->d_name) || strcmp(DIRL_ENTRY, de->d_name) ||
+            strcmp(DIRL_FOOTER, de->d_name)) {
+          closedir(cur);
+          return path_buf;
+        }
+      }
+    }
+
+    char* parent = strrchr(path_buf, '/');
+    (*parent) = '\0'; // strip tail from path_buf
   }
 
-  return 0;
+  free(path_buf);
+  return NULL;
+}
+
+struct dirl_templ
+dirl_read_templ(const char* path)
+{
+  struct dirl_templ templates = { .header = DIRL_HEADER_DEFAULT,
+                                  .entry = DIRL_ENTRY_DEFAULT,
+                                  .footer = DIRL_FOOTER_DEFAULT };
+
+  char* templ_dir = dirl_find_templ_dir(path);
+
+  char* header_file =
+    calloc(sizeof(char), strlen(templ_dir) + strlen(DIRL_HEADER));
+  strcpy(header_file, templ_dir);
+  strcat(header_file, DIRL_HEADER);
+  char* header = dirl_read(header_file);
+  if (header)
+    templates.header = header;
+  free(header_file);
+
+  char* entry_file =
+    calloc(sizeof(char), strlen(templ_dir) + strlen(DIRL_ENTRY));
+  strcpy(entry_file, templ_dir);
+  strcat(entry_file, DIRL_ENTRY);
+  char* entry = dirl_read(entry_file);
+  if (entry)
+    templates.entry = entry;
+  free(entry_file);
+
+  char* footer_file =
+    calloc(sizeof(char), strlen(templ_dir) + strlen(DIRL_FOOTER));
+  strcpy(footer_file, templ_dir);
+  strcat(footer_file, DIRL_FOOTER);
+  char* footer = dirl_read(footer_file);
+  if (footer)
+    templates.footer = footer;
+  free(footer_file);
+
+  free(templ_dir);
+
+  return templates;
 }
 
 enum status
-dirl_header(int fd, const struct response* res)
+dirl_header(int fd, const struct response* res, const struct dirl_templ* templ)
 {
-  char* tpl = dirl_read_template(DIRL_HEADER);
-
-  if(tpl == NULL) {
-    return dirl_header_default(fd, res);
-  }
-
   /* Replace placeholder */
-  char* nhead = replace(tpl, "{idx}", "something");
+  char* nhead = replace(templ->header, "{curdir}", "something");
 
   /* Write header */
   write(fd, nhead, strlen(nhead));
 
-  free(tpl);
   free(nhead);
 
   /* listing header */
   return 0;
 }
 
-static enum status
-dirl_entry_default(int fd, const struct dirent* entry)
-{
-  char esc[PATH_MAX];
-
-  html_escape(entry->d_name, esc, sizeof(esc));
-  if (dprintf(fd,
-              "<br />\n\t\t<a href=\"%s%s\">%s%s</a>",
-              esc,
-              (entry->d_type == DT_DIR) ? "/" : "",
-              esc,
-              suffix(entry->d_type)) < 0) {
-    return S_REQUEST_TIMEOUT;
-  }
-
-  return 0;
-}
-
 enum status
-dirl_entry(int fd, const struct dirent* entry)
+dirl_entry(int fd, const struct dirent* entry, const struct dirl_templ* templ)
 {
-  char* tpl = dirl_read_template(DIRL_ENTRY);
-
-  if (tpl == NULL) {
-    return dirl_entry_default(fd, entry);
-  }
-
   /* Replace placeholder */
-  char* nentry = replace(tpl, "{entry}", entry->d_name);
+  char* nentry = replace(templ->entry, "{entry}", entry->d_name);
 
   /* Write entry */
   write(fd, nentry, strlen(nentry));
 
-  free(tpl);
   free(nentry);
 
   return 0;
 }
 
-static enum status
-dirl_footer_default(int fd)
-{
-  if (dprintf(fd,
-              "\n"
-              "  </body>\n"
-              "</html>") < 0) {
-    return S_REQUEST_TIMEOUT;
-  }
-
-  return 0;
-}
-
 enum status
-dirl_footer(int fd)
+dirl_footer(int fd, const struct dirl_templ* templ)
 {
-  char* tpl = dirl_read_template(DIRL_FOOTER);
-
-  if(tpl == NULL) {
-    return dirl_footer_default(fd);
-  }
-
   /* Replace placeholder */
-  char* nfoot = replace(tpl, "{idx}", "something");
+  char* nfoot = replace(templ->footer, "{idx}", "something");
 
   /* Write footer */
   write(fd, nfoot, strlen(nfoot));
 
-  free(tpl);
   free(nfoot);
   return 0;
 }
@@ -211,10 +201,9 @@ dirl_footer(int fd)
 int
 dirl_skip(const char* name)
 {
-  (void)name; // noop; avoid unused warning
-
-  return !strcmp(name, DIRL_HEADER)    //
+  return name[0] == '.'                //
+         || !strcmp(name, DIRL_HEADER) //
          || !strcmp(name, DIRL_ENTRY)  //
          || !strcmp(name, DIRL_FOOTER) //
-         || !strcmp(name, DIRL_STYLE);
+         || !strcmp(name, DIRL_STYLE); //
 }

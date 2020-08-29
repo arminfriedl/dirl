@@ -183,7 +183,7 @@ replace(const char *src, const char *old, const char* new) {
   }
 
   /* Allocate enough space for the new string */
-  char *buf = malloc( (sizeof(char)*src_len) + (sizeof(char)*replc*(new_len-old_len)) + 1);
+  char *buf = calloc( sizeof(char), src_len + replc*(abs(new_len-old_len)) + 1);
 
   /* Now start replacing */
   const char *srcidx = src;
@@ -193,7 +193,8 @@ replace(const char *src, const char *old, const char* new) {
   while (replc--) {
     srcidx_old = strstr(srcidx, old);
 
-    bufidx = strncpy(bufidx, srcidx, srcidx_old - srcidx) + (srcidx_old-srcidx);
+    long repl_len = labs(srcidx_old - srcidx);
+    bufidx = strncpy(bufidx, srcidx, repl_len) + repl_len;
     bufidx = strcpy(bufidx, new) + new_len;
 
     srcidx = srcidx_old+old_len;

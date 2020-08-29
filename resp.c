@@ -40,32 +40,30 @@ resp_dir(int fd, const struct response *res)
 		return S_FORBIDDEN;
 	}
 
+  /* read templates */
+  struct dirl_templ templates = dirl_read_templ(res->path);
+
   /* listing header */
-  if ((ret = dirl_header(fd, res))) {
+  if ((ret = dirl_header(fd, res, &templates))) {
     return ret;
   }
 
 	/* entries */
 	for (i = 0; i < (size_t)dirlen; i++) {
-		/* skip hidden files, "." and ".." */
-		if (e[i]->d_name[0] == '.') {
-			continue;
-		}
-
     /*  skip dirl special files */
     if(dirl_skip(e[i]->d_name)) {
       continue;
     }
 
     /* entry line */
-    if ((ret = dirl_entry(fd, e[i]))) {
+    if ((ret = dirl_entry(fd, e[i], &templates))) {
       goto cleanup;
     }
 
 	}
 
   /* listing footer */
-  if ((ret = dirl_footer(fd))) {
+  if ((ret = dirl_footer(fd, &templates))) {
     goto cleanup;
   }
 
