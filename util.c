@@ -123,6 +123,92 @@ prepend(char *str, size_t size, const char *prefix)
   return 0;
 }
 
+void
+replace(char **src, const char *old, const char* new) {
+  int old_len = strlen(old);
+  int new_len = strlen(new);
+  int src_len = strlen(*src);
+
+  /* Count needed replacements */
+  const char* tmp = *src;
+  int replc=0;
+  while ((tmp=strstr(tmp, old))) {
+    replc++;
+    tmp += old_len;
+  }
+
+  /* Allocate enough space for the new string */
+  char *buf = calloc( sizeof(char), src_len + replc*(abs(new_len-old_len)) + 1);
+
+  /* Now start replacing */
+  const char *srcidx = *src;
+  const char *srcidx_old = *src;
+  char *bufidx = buf;
+
+  while (replc--) {
+    srcidx_old = strstr(srcidx, old);
+
+    long repl_len = labs(srcidx_old - srcidx);
+    bufidx = strncpy(bufidx, srcidx, repl_len) + repl_len;
+    bufidx = strcpy(bufidx, new) + new_len;
+
+    srcidx = srcidx_old+old_len;
+  }
+
+  strncpy(bufidx, srcidx, strlen(srcidx)); // copy tail
+
+  free(*src);
+  *src = buf;
+}
+
+char*
+read_file(const char* path){
+  FILE* tpl_fp;
+
+  if (!(tpl_fp = fopen(path, "r"))) {
+    return NULL;
+  }
+
+  /* Get size of template */
+  if (fseek(tpl_fp, 0L, SEEK_END) < 0) {
+    fclose(tpl_fp);
+    return NULL;
+  }
+
+  long tpl_size;
+  if ((tpl_size = ftell(tpl_fp)) < 0) {
+    fclose(tpl_fp);
+    return NULL;
+  }
+
+  rewind(tpl_fp);
+
+  /* Read template into tpl_buf */
+  char* tpl_buf = (char*)calloc(sizeof(char), tpl_size);
+
+  if (tpl_buf == NULL) {
+    fclose(tpl_fp);
+    free(tpl_buf);
+    return NULL;
+  }
+
+  if (fread(tpl_buf, 1, tpl_size, tpl_fp) < tpl_size) {
+    if (feof(tpl_fp)) {
+      warn("Reached end of file %s prematurely", path);
+    } else if (ferror(tpl_fp)) {
+      warn("Error while reading file %s", path);
+    }
+
+    fclose(tpl_fp);
+    free(tpl_buf);
+    clearerr(tpl_fp);
+
+    return NULL;
+  }
+
+  return tpl_buf;
+}
+
 #define	INVALID  1
 #define	TOOSMALL 2
 #define	TOOLARGE 3
