@@ -2,11 +2,13 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -31,6 +33,49 @@ suffix(int t)
   return "";
 }
 
+static void
+html_escape(const char* src, char* dst, size_t dst_siz)
+{
+  const struct
+  {
+    char c;
+    char* s;
+  } escape[] = {
+    { '&', "&amp;" },  { '<', "&lt;" },    { '>', "&gt;" },
+    { '"', "&quot;" }, { '\'', "&#x27;" },
+  };
+  size_t i, j, k, esclen;
+
+  for (i = 0, j = 0; src[i] != '\0'; i++) {
+    for (k = 0; k < LEN(escape); k++) {
+      if (src[i] == escape[k].c) {
+        break;
+      }
+    }
+    if (k == LEN(escape)) {
+      /* no escape char at src[i] */
+      if (j == dst_siz - 1) {
+        /* silent truncation */
+        break;
+      } else {
+        dst[j++] = src[i];
+      }
+    } else {
+      /* escape char at src[i] */
+      esclen = strlen(escape[k].s);
+
+      if (j >= dst_siz - esclen) {
+        /* silent truncation */
+        break;
+      } else {
+        memcpy(&dst[j], escape[k].s, esclen);
+        j += esclen;
+      }
+    }
+  }
+  dst[j] = '\0';
+}
+
 /* Try to find templates up until root
  *
  * Iterates the directory hierarchy upwards. Returns the closest path containing
@@ -44,8 +89,8 @@ dirl_find_templ_dir(const char* start_path)
   char* path_buf = calloc(sizeof(char), strlen(start_path));
   strcat(path_buf, start_path);
 
-  if(path_buf[strlen(path_buf)-1] == '/') {
-    // don't read last dir twice
+  if(strlen(path_buf) > 1 && path_buf[strlen(path_buf)-1] == '/') {
+    // don't read last dir twice, except at root
     path_buf[strlen(path_buf)-1] = '\0';
   }
 
@@ -123,8 +168,8 @@ enum status
 dirl_header(int fd, const struct response* res, const struct dirl_templ* templ)
 {
   /* Replace placeholder */
-  char* nhead = calloc(sizeof(char), strlen(templ->header));
-  memcpy(nhead, templ->header, strlen(templ->header));
+  char* nhead = calloc(sizeof(char), strlen(templ->header)+1);
+  memcpy(nhead, templ->header, strlen(templ->header)+1);
   replace(&nhead, "{uri}", res->uri);
 
   /* Write header */
@@ -139,11 +184,33 @@ dirl_header(int fd, const struct response* res, const struct dirl_templ* templ)
 enum status
 dirl_entry(int fd, const struct dirent* entry, const struct dirl_templ* templ)
 {
+  struct stat stat_buf;
+  lstat(entry->d_name, &stat_buf);
+
+  char* nentry = calloc(sizeof(char), strlen(templ->entry)+1);
+  //strcat(nentry, templ->entry);
+  memcpy(nentry, templ->entry, strlen(templ->entry)+1);
+
   /* Replace placeholder */
-  char* nentry = calloc(sizeof(char), strlen(templ->entry));
-  memcpy(nentry, templ->entry, strlen(templ->entry));
+  char esc[PATH_MAX * 6];
+  html_escape(entry->d_name, esc, PATH_MAX*6);
   replace(&nentry, "{entry}", entry->d_name);
+
   replace(&nentry, "{suffix}", suffix(entry->d_type));
+
+  char size_buf[1024];
+  if(entry->d_type == DT_REG) {
+    snprintf(size_buf, 1024, "%ld", stat_buf.st_size);
+  } else {
+    sprintf(size_buf, "-");
+  }
+  replace(&nentry, "{size}", size_buf);
+
+  char time_buf[1024];
+  struct tm tm;
+  gmtime_r(&stat_buf.st_mtim.tv_sec, &tm);
+  strftime(time_buf, 1024, "%F %H:%m", &tm);
+  replace(&nentry, "{modified}", time_buf);
 
   /* Write entry */
   write(fd, nentry, strlen(nentry));
@@ -157,9 +224,8 @@ enum status
 dirl_footer(int fd, const struct dirl_templ* templ)
 {
   /* Replace placeholder */
-  char* nfoot = calloc(sizeof(char), strlen(templ->footer));
-  memcpy(nfoot, templ->footer, strlen(templ->footer));
-  replace(&nfoot, "{idx}", "something");
+  char* nfoot = calloc(sizeof(char), strlen(templ->footer)+1);
+  memcpy(nfoot, templ->footer, strlen(templ->footer)+1);
 
   /* Write footer */
   write(fd, nfoot, strlen(nfoot));

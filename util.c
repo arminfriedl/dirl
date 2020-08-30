@@ -138,7 +138,8 @@ replace(char **src, const char *old, const char* new) {
   }
 
   /* Allocate enough space for the new string */
-  char *buf = calloc( sizeof(char), src_len + replc*(abs(new_len-old_len)) + 1);
+  size_t buf_size = src_len + replc * (new_len - old_len) + 1;
+  char* buf = calloc(sizeof(char), buf_size);
 
   /* Now start replacing */
   const char *srcidx = *src;
@@ -192,7 +193,7 @@ read_file(const char* path){
     return NULL;
   }
 
-  if (fread(tpl_buf, 1, tpl_size, tpl_fp) < tpl_size) {
+  if (fread(tpl_buf, 1, tpl_size, tpl_fp) < (size_t) tpl_size) {
     if (feof(tpl_fp)) {
       warn("Reached end of file %s prematurely", path);
     } else if (ferror(tpl_fp)) {

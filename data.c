@@ -26,64 +26,6 @@ compareent(const struct dirent **d1, const struct dirent **d2)
 	return strcmp((*d1)->d_name, (*d2)->d_name);
 }
 
-static char *
-suffix(int t)
-{
-	switch (t) {
-	case DT_FIFO: return "|";
-	case DT_DIR:  return "/";
-	case DT_LNK:  return "@";
-	case DT_SOCK: return "=";
-	}
-
-	return "";
-}
-
-static void
-html_escape(const char *src, char *dst, size_t dst_siz)
-{
-	const struct {
-		char c;
-		char *s;
-	} escape[] = {
-		{ '&',  "&amp;"  },
-		{ '<',  "&lt;"   },
-		{ '>',  "&gt;"   },
-		{ '"',  "&quot;" },
-		{ '\'', "&#x27;" },
-	};
-	size_t i, j, k, esclen;
-
-	for (i = 0, j = 0; src[i] != '\0'; i++) {
-		for (k = 0; k < LEN(escape); k++) {
-			if (src[i] == escape[k].c) {
-				break;
-			}
-		}
-		if (k == LEN(escape)) {
-			/* no escape char at src[i] */
-			if (j == dst_siz - 1) {
-				/* silent truncation */
-				break;
-			} else {
-				dst[j++] = src[i];
-			}
-		} else {
-			/* escape char at src[i] */
-			esclen = strlen(escape[k].s);
-
-			if (j >= dst_siz - esclen) {
-				/* silent truncation */
-				break;
-			} else {
-				memcpy(&dst[j], escape[k].s, esclen);
-				j += esclen;
-			}
-		}
-	}
-	dst[j] = '\0';
-}
-
 enum status
 data_send_dirlisting(int fd, const struct response *res)
 {
@@ -91,7 +33,6 @@ data_send_dirlisting(int fd, const struct response *res)
 	struct dirent **e;
 	size_t i;
 	int dirlen;
-	char esc[PATH_MAX /* > NAME_MAX */ * 6]; /* strlen("&...;") <= 6 */
 
 	/* read directory */
 	if ((dirlen = scandir(res->path, &e, NULL, compareent)) < 0) {

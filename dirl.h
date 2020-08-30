@@ -26,16 +26,31 @@
   "  </head>\n"                                                                \
   "  <body>\n"                                                                 \
   "    <h1>Index of {uri}</h1>\n"                                              \
-  "    <hr />"                                                                 \
-  "    <a href=\"..\">..</a>\n"
+  "    <p><a href=\"..\">&crarr; Parent Directory</a></p>\n"                   \
+  "    <hr />\n"                                                               \
+  "    <table>\n"                                                              \
+  "    <tr><th>Name</th><th>Modified</th><th>Size</th></tr>"
 
 #define DIRL_ENTRY_DEFAULT                                                     \
-  "    <br />\n"                                                               \
-  "    <a href=\"{entry}\">{entry}{suffix}</a>\n"
+  "    <tr>\n"                                                                 \
+  "     <td><a href=\"{entry}\">{entry}{suffix}</a>\n"                         \
+  "     <td>{modified}</td>\n"                                                 \
+  "     <td>{size}</td>\n"                                                     \
+  "    </tr>\n"
 
 #define DIRL_FOOTER_DEFAULT                                                    \
-  "    <hr />"                                                                 \
-  "  </body>\n"                                                                \
+  "    </table>\n"                                                             \
+  "    <hr />\n"                                                               \
+  "    <p>"                                                                    \
+  "Served by"                                                                  \
+  " <a href=\"http://tools.suckless.org/quark/\">quark</a>"                    \
+  " and"                                                                       \
+  " <a href="                                                                  \
+  "\"https://git.friedl.net/playground/suckless-quark/src/branch/dirlist\">"   \
+  "dirl"                                                                       \
+  "</a>"                                                                       \
+  "</p>\n"                                                                     \
+  "</body>\n"                                                                  \
   "</html>"
 
 struct dirl_templ
