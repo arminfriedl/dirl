@@ -41,7 +41,7 @@ resp_dir(int fd, const struct response *res)
 	}
 
   /* read templates */
-  struct dirl_templ templates = dirl_read_templ(res->path);
+  struct dirl_templ templates = dirl_read_templ(res->uri);
 
   /* listing header */
   if ((ret = dirl_header(fd, res, &templates))) {

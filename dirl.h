@@ -22,10 +22,11 @@
   "<html>\n"                                                                   \
   "  <head>\n"                                                                 \
   "    <link rel=\"stylesheet\" href=\"/" DIRL_STYLE "\">\n"                   \
-  "    <title>Index of {curdir}</title>\n"                                     \
+  "    <title>Index of {uri}</title>\n"                                        \
   "  </head>\n"                                                                \
   "  <body>\n"                                                                 \
-  "    <h1>Index of {curdir}</h1>\n"                                           \
+  "    <h1>Index of {uri}</h1>\n"                                              \
+  "    <hr />"                                                                 \
   "    <a href=\"..\">..</a>\n"
 
 #define DIRL_ENTRY_DEFAULT                                                     \
@@ -33,6 +34,7 @@
   "    <a href=\"{entry}\">{entry}{suffix}</a>\n"
 
 #define DIRL_FOOTER_DEFAULT                                                    \
+  "    <hr />"                                                                 \
   "  </body>\n"                                                                \
   "</html>"
 

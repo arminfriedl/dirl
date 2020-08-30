@@ -44,6 +44,11 @@ dirl_find_templ_dir(const char* start_path)
   char* path_buf = calloc(sizeof(char), strlen(start_path));
   strcat(path_buf, start_path);
 
+  if(path_buf[strlen(path_buf)-1] == '/') {
+    // don't read last dir twice
+    path_buf[strlen(path_buf)-1] = '\0';
+  }
+
   while (strlen(path_buf) != 0) {
     DIR* cur = opendir(path_buf);
     struct dirent* de;
@@ -58,8 +63,17 @@ dirl_find_templ_dir(const char* start_path)
       }
     }
 
-    char* parent = strrchr(path_buf, '/');
-    (*parent) = '\0'; // strip tail from path_buf
+    if (strlen(path_buf) > 1) {
+      char* parent = strrchr(path_buf, '/');
+      (*parent) = '\0'; // strip tail from path_buf
+
+      if(strlen(path_buf) == 0) { // we stripped root, let it loop once more
+        path_buf[0] = '/';
+        path_buf[1] = '\0';
+      }
+    } else {
+      path_buf[0] = '\0'; // we checked root, now terminate loop
+    }
   }
 
   free(path_buf);
@@ -70,6 +84,11 @@ dirl_find_templ_dir(const char* start_path)
 static void
 dirl_fill_templ(char** templ, char* base, char* name, char* def)
 {
+  if (!base || !name) {
+    *templ = def;
+    return;
+  }
+
   char* path = calloc(sizeof(char), strlen(base) + strlen(name));
   strcpy(path, base);
   strcat(path, name);
@@ -106,7 +125,7 @@ dirl_header(int fd, const struct response* res, const struct dirl_templ* templ)
   /* Replace placeholder */
   char* nhead = calloc(sizeof(char), strlen(templ->header));
   memcpy(nhead, templ->header, strlen(templ->header));
-  replace(&nhead, "{curdir}", res->path);
+  replace(&nhead, "{uri}", res->uri);
 
   /* Write header */
   write(fd, nhead, strlen(nhead));
