@@ -3,6 +3,7 @@
 #define HTTP_H
 
 #include <limits.h>
+#include <sys/socket.h>
 
 #include "util.h"
 
@@ -82,17 +83,20 @@ struct response {
 	} file;
 };
 
+extern enum status (* const body_fct[])(int, const struct response *);
+
 enum conn_state {
 	C_VACANT,
 	C_RECV_HEADER,
 	C_SEND_HEADER,
-	C_SEND_DATA,
+	C_SEND_BODY,
 	NUM_CONN_STATES,
 };
 
 struct connection {
 	enum conn_state state;
 	int fd;
+	struct sockaddr_storage ia;
 	char header[HEADER_MAX]; /* general req/res-header buffer */
 	size_t off;              /* general offset (header/file/dir) */
 	struct request req;
@@ -103,7 +107,11 @@ enum status http_send_header(int, const struct response *);
 enum status http_send_status(int, enum status);
 enum status http_recv_header(int, char *, size_t, size_t *);
 enum status http_parse_header(const char *, struct request *);
-enum status http_prepare_response(const struct request *, struct response *,
-                                  const struct server *);
+void http_prepare_response(const struct request *, struct response *,
+                           const struct server *);
+void http_prepare_error_response(const struct request *,
+                                 struct response *, enum status);
+enum status http_send_body(int, const struct response *,
+                           const struct request *);
 
 #endif /* HTTP_H */

@@ -17,8 +17,8 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "data.h"
 #include "http.h"
-#include "resp.h"
 #include "util.h"
 
 const char *req_field_str[] = {
@@ -58,10 +58,16 @@ const char *res_field_str[] = {
 	[RES_CONTENT_TYPE]   = "Content-Type",
 };
 
+enum status (* const body_fct[])(int, const struct response *) = {
+	[RESTYPE_ERROR]      = data_send_error,
+	[RESTYPE_FILE]       = data_send_file,
+	[RESTYPE_DIRLISTING] = data_send_dirlisting,
+};
+
 enum status
 http_send_header(int fd, const struct response *res)
 {
-	char t[FIELD_MAX], esc[PATH_MAX];
+	char t[FIELD_MAX];
 	size_t i;
 
 	if (timestamp(t, sizeof(t), time(NULL))) {
@@ -89,52 +95,7 @@ http_send_header(int fd, const struct response *res)
 		return S_REQUEST_TIMEOUT;
 	}
 
-	/* listing header */
-	if (res->type == RESTYPE_DIRLISTING) {
-		html_escape(res->uri, esc, sizeof(esc));
-		if (dprintf(fd,
-		            "<!DOCTYPE html>\n<html>\n\t<head>"
-		            "<title>Index of %s</title></head>\n"
-		            "\t<body>\n\t\t<a href=\"..\">..</a>",
-		            esc) < 0) {
-			return S_REQUEST_TIMEOUT;
-		}
-	}
-
-	return res->status;
-}
-
-enum status
-http_send_status(int fd, enum status s)
-{
-	enum status sendstatus;
-
-	struct response res = {
-		.status                  = s,
-		.field[RES_CONTENT_TYPE] = "text/html; charset=utf-8",
-	};
-
-	if (s == S_METHOD_NOT_ALLOWED) {
-		if (esnprintf(res.field[RES_ALLOW],
-		              sizeof(res.field[RES_ALLOW]), "%s",
-			      "Allow: GET, HEAD")) {
-			return S_INTERNAL_SERVER_ERROR;
-		}
-	}
-
-	if ((sendstatus = http_send_header(fd, &res)) != s) {
-		return sendstatus;
-	}
-
-	if (dprintf(fd,
-	            "<!DOCTYPE html>\n<html>\n\t<head>\n"
-	            "\t\t<title>%d %s</title>\n\t</head>\n\t<body>\n"
-	            "\t\t<h1>%d %s</h1>\n\t</body>\n</html>\n",
-	            s, status_str[s], s, status_str[s]) < 0) {
-		return S_REQUEST_TIMEOUT;
-	}
-
-	return s;
+	return 0;
 }
 
 static void
@@ -547,11 +508,11 @@ parse_range(const char *str, size_t size, size_t *lower, size_t *upper)
 #undef RELPATH
 #define RELPATH(x) ((!*(x) || !strcmp(x, "/")) ? "." : ((x) + 1))
 
-enum status
+void
 http_prepare_response(const struct request *req, struct response *res,
                       const struct server *srv)
 {
-	enum status returnstatus;
+	enum status s;
 	struct in6_addr addr;
 	struct stat st;
 	struct tm tm = { 0 };
@@ -568,7 +529,8 @@ http_prepare_response(const struct request *req, struct response *res,
 	/* make a working copy of the URI and normalize it */
 	memcpy(realuri, req->uri, sizeof(realuri));
 	if (normabspath(realuri)) {
-		return S_BAD_REQUEST;
+		s = S_BAD_REQUEST;
+		goto err;
 	}
 
 	/* match vhost */
@@ -583,13 +545,15 @@ http_prepare_response(const struct request *req, struct response *res,
 			}
 		}
 		if (i == srv->vhost_len) {
-			return S_NOT_FOUND;
+			s = S_NOT_FOUND;
+			goto err;
 		}
 
 		/* if we have a vhost prefix, prepend it to the URI */
 		if (vhost->prefix &&
 		    prepend(realuri, LEN(realuri), vhost->prefix)) {
-			return S_REQUEST_TOO_LARGE;
+			s = S_REQUEST_TOO_LARGE;
+			goto err;
 		}
 	}
 
@@ -607,7 +571,8 @@ http_prepare_response(const struct request *req, struct response *res,
 			/* swap out URI prefix */
 			memmove(realuri, realuri + len, strlen(realuri) + 1);
 			if (prepend(realuri, LEN(realuri), srv->map[i].to)) {
-				return S_REQUEST_TOO_LARGE;
+				s = S_REQUEST_TOO_LARGE;
+				goto err;
 			}
 			break;
 		}
@@ -615,19 +580,22 @@ http_prepare_response(const struct request *req, struct response *res,
 
 	/* normalize URI again, in case we introduced dirt */
 	if (normabspath(realuri)) {
-		return S_BAD_REQUEST;
+		s = S_BAD_REQUEST;
+		goto err;
 	}
 
 	/* stat the relative path derived from the URI */
 	if (stat(RELPATH(realuri), &st) < 0) {
-		return (errno == EACCES) ? S_FORBIDDEN : S_NOT_FOUND;
+		s = (errno == EACCES) ? S_FORBIDDEN : S_NOT_FOUND;
+		goto err;
 	}
 
 	if (S_ISDIR(st.st_mode)) {
 		/* append '/' to URI if not present */
 		len = strlen(realuri);
 		if (len + 1 + 1 > PATH_MAX) {
-			return S_REQUEST_TOO_LARGE;
+			s = S_REQUEST_TOO_LARGE;
+			goto err;
 		}
 		if (len > 0 && realuri[len - 1] != '/') {
 			realuri[len] = '/';
@@ -641,7 +609,8 @@ http_prepare_response(const struct request *req, struct response *res,
 	 */
 	if (strstr(realuri, "/.") && strncmp(realuri,
 	    "/.well-known/", sizeof("/.well-known/") - 1)) {
-		return S_FORBIDDEN;
+		s = S_FORBIDDEN;
+		goto err;
 	}
 
 	/*
@@ -670,7 +639,8 @@ http_prepare_response(const struct request *req, struct response *res,
 			 * honor that later when we fill the "Location"-field */
 			if ((ipv6host = inet_pton(AF_INET6, targethost,
 			                          &addr)) < 0) {
-				return S_INTERNAL_SERVER_ERROR;
+				s = S_INTERNAL_SERVER_ERROR;
+				goto err;
 			}
 
 			/* write location to response struct */
@@ -681,18 +651,20 @@ http_prepare_response(const struct request *req, struct response *res,
 			              targethost,
 			              ipv6host ? "]" : "", hasport ? ":" : "",
 			              hasport ? srv->port : "", tmpuri)) {
-				return S_REQUEST_TOO_LARGE;
+				s = S_REQUEST_TOO_LARGE;
+				goto err;
 			}
 		} else {
 			/* write relative redirection URI to response struct */
 			if (esnprintf(res->field[RES_LOCATION],
 			              sizeof(res->field[RES_LOCATION]),
 			              "%s", tmpuri)) {
-				return S_REQUEST_TOO_LARGE;
+				s = S_REQUEST_TOO_LARGE;
+				goto err;
 			}
 		}
 
-		return 0;
+		return;
 	} else {
 		/*
 		 * the URI is well-formed, we can now write the URI into
@@ -701,11 +673,13 @@ http_prepare_response(const struct request *req, struct response *res,
 		 * into the actual response-path
 		 */
 		if (esnprintf(res->uri, sizeof(res->uri), "%s", req->uri)) {
-			return S_REQUEST_TOO_LARGE;
+			s = S_REQUEST_TOO_LARGE;
+			goto err;
 		}
 		if (esnprintf(res->path, sizeof(res->path), "%s%s",
 		    vhost ? vhost->dir : "", RELPATH(req->uri))) {
-			return S_REQUEST_TOO_LARGE;
+			s = S_REQUEST_TOO_LARGE;
+			goto err;
 		}
 	}
 
@@ -716,7 +690,8 @@ http_prepare_response(const struct request *req, struct response *res,
 		 */
 		if (esnprintf(tmpuri, sizeof(tmpuri), "%s%s",
 		              req->uri, srv->docindex)) {
-			return S_REQUEST_TOO_LARGE;
+			s = S_REQUEST_TOO_LARGE;
+			goto err;
 		}
 
 		/* stat the docindex, which must be a regular file */
@@ -730,14 +705,16 @@ http_prepare_response(const struct request *req, struct response *res,
 				if (esnprintf(res->field[RES_CONTENT_TYPE],
 				              sizeof(res->field[RES_CONTENT_TYPE]),
 					      "%s", "text/html; charset=utf-8")) {
-					return S_INTERNAL_SERVER_ERROR;
+					s = S_INTERNAL_SERVER_ERROR;
+					goto err;
 				}
 
-				return 0;
+				return;
 			} else {
 				/* reject */
-				return (!S_ISREG(st.st_mode) || errno == EACCES) ?
-				       S_FORBIDDEN : S_NOT_FOUND;
+				s = (!S_ISREG(st.st_mode) || errno == EACCES) ?
+				    S_FORBIDDEN : S_NOT_FOUND;
+				goto err;
 			}
 		}
 	}
@@ -747,32 +724,33 @@ http_prepare_response(const struct request *req, struct response *res,
 		/* parse field */
 		if (!strptime(req->field[REQ_IF_MODIFIED_SINCE],
 		              "%a, %d %b %Y %T GMT", &tm)) {
-			return S_BAD_REQUEST;
+			s = S_BAD_REQUEST;
+			goto err;
 		}
 
 		/* compare with last modification date of the file */
 		if (difftime(st.st_mtim.tv_sec, timegm(&tm)) <= 0) {
 			res->status = S_NOT_MODIFIED;
-			return 0;
+			return;
 		}
 	}
 
 	/* range */
-	if ((returnstatus = parse_range(req->field[REQ_RANGE], st.st_size,
-	                                &(res->file.lower),
-	                                &(res->file.upper)))) {
-		if (returnstatus == S_RANGE_NOT_SATISFIABLE) {
+	if ((s = parse_range(req->field[REQ_RANGE], st.st_size,
+	                     &(res->file.lower), &(res->file.upper)))) {
+		if (s == S_RANGE_NOT_SATISFIABLE) {
 			res->status = S_RANGE_NOT_SATISFIABLE;
 
 			if (esnprintf(res->field[RES_CONTENT_RANGE],
 			              sizeof(res->field[RES_CONTENT_RANGE]),
 			              "bytes */%zu", st.st_size)) {
-				return S_INTERNAL_SERVER_ERROR;
+				s = S_INTERNAL_SERVER_ERROR;
+				goto err;
 			}
 
-			return 0;
+			return;
 		} else {
-			return returnstatus;
+			goto err;
 		}
 	}
 
@@ -798,31 +776,79 @@ http_prepare_response(const struct request *req, struct response *res,
 	if (esnprintf(res->field[RES_ACCEPT_RANGES],
 	              sizeof(res->field[RES_ACCEPT_RANGES]),
 		      "%s", "bytes")) {
-		return S_INTERNAL_SERVER_ERROR;
+		s = S_INTERNAL_SERVER_ERROR;
+		goto err;
 	}
 
 	if (esnprintf(res->field[RES_CONTENT_LENGTH],
 	              sizeof(res->field[RES_CONTENT_LENGTH]),
 	              "%zu", res->file.upper - res->file.lower + 1)) {
-		return S_INTERNAL_SERVER_ERROR;
+		s = S_INTERNAL_SERVER_ERROR;
+		goto err;
 	}
 	if (req->field[REQ_RANGE][0] != '\0') {
 		if (esnprintf(res->field[RES_CONTENT_RANGE],
 		              sizeof(res->field[RES_CONTENT_RANGE]),
 		              "bytes %zd-%zd/%zu", res->file.lower,
 			      res->file.upper, st.st_size)) {
-			return S_INTERNAL_SERVER_ERROR;
+			s = S_INTERNAL_SERVER_ERROR;
+			goto err;
 		}
 	}
 	if (esnprintf(res->field[RES_CONTENT_TYPE],
 	              sizeof(res->field[RES_CONTENT_TYPE]),
 	              "%s", mime)) {
-		return S_INTERNAL_SERVER_ERROR;
+		s = S_INTERNAL_SERVER_ERROR;
+		goto err;
 	}
 	if (timestamp(res->field[RES_LAST_MODIFIED],
 	              sizeof(res->field[RES_LAST_MODIFIED]),
 	              st.st_mtim.tv_sec)) {
-		return S_INTERNAL_SERVER_ERROR;
+		s = S_INTERNAL_SERVER_ERROR;
+		goto err;
+	}
+
+	return;
+err:
+	http_prepare_error_response(req, res, s);
+}
+
+void
+http_prepare_error_response(const struct request *req,
+                            struct response *res, enum status s)
+{
+	/* used later */
+	(void)req;
+
+	/* empty all response fields */
+	memset(res, 0, sizeof(*res));
+
+	res->type = RESTYPE_ERROR;
+	res->status = s;
+
+	if (esnprintf(res->field[RES_CONTENT_TYPE],
+	              sizeof(res->field[RES_CONTENT_TYPE]),
+	              "text/html; charset=utf-8")) {
+		res->status = S_INTERNAL_SERVER_ERROR;
+	}
+
+	if (res->status == S_METHOD_NOT_ALLOWED) {
+		if (esnprintf(res->field[RES_ALLOW],
+		              sizeof(res->field[RES_ALLOW]),
+			      "Allow: GET, HEAD")) {
+			res->status = S_INTERNAL_SERVER_ERROR;
+		}
+	}
+}
+
+enum status
+http_send_body(int fd, const struct response *res,
+               const struct request *req)
+{
+	enum status s;
+
+	if (req->method == M_GET && (s = body_fct[res->type](fd, res))) {
+		return s;
 	}
 
 	return 0;
