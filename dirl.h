@@ -30,7 +30,7 @@
 
 #define DIRL_ENTRY_DEFAULT                                                     \
   "    <br />\n"                                                               \
-  "    <a href=\"{entry}\">{entry}</a>\n"
+  "    <a href=\"{entry}\">{entry}{suffix}</a>\n"
 
 #define DIRL_FOOTER_DEFAULT                                                    \
   "  </body>\n"                                                                \
@@ -38,9 +38,9 @@
 
 struct dirl_templ
 {
-  const char* header;
-  const char* entry;
-  const char* footer;
+  char* header;
+  char* entry;
+  char* footer;
 };
 
 struct dirl_templ

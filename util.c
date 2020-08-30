@@ -20,162 +20,162 @@ char *argv0;
 static void
 verr(const char *fmt, va_list ap)
 {
-	if (argv0 && strncmp(fmt, "usage", sizeof("usage") - 1)) {
-		fprintf(stderr, "%s: ", argv0);
-	}
+  if (argv0 && strncmp(fmt, "usage", sizeof("usage") - 1)) {
+    fprintf(stderr, "%s: ", argv0);
+  }
 
-	vfprintf(stderr, fmt, ap);
+  vfprintf(stderr, fmt, ap);
 
-	if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
-		fputc(' ', stderr);
-		perror(NULL);
-	} else {
-		fputc('\n', stderr);
-	}
+  if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
+    fputc(' ', stderr);
+    perror(NULL);
+  } else {
+    fputc('\n', stderr);
+  }
 }
 
 void
 warn(const char *fmt, ...)
 {
-	va_list ap;
+  va_list ap;
 
-	va_start(ap, fmt);
-	verr(fmt, ap);
-	va_end(ap);
+  va_start(ap, fmt);
+  verr(fmt, ap);
+  va_end(ap);
 }
 
 void
 die(const char *fmt, ...)
 {
-	va_list ap;
+  va_list ap;
 
-	va_start(ap, fmt);
-	verr(fmt, ap);
-	va_end(ap);
+  va_start(ap, fmt);
+  verr(fmt, ap);
+  va_end(ap);
 
-	exit(1);
+  exit(1);
 }
 
 void
 epledge(const char *promises, const char *execpromises)
 {
-	(void)promises;
-	(void)execpromises;
+  (void)promises;
+  (void)execpromises;
 
 #ifdef __OpenBSD__
-	if (pledge(promises, execpromises) == -1) {
-		die("pledge:");
-	}
+  if (pledge(promises, execpromises) == -1) {
+    die("pledge:");
+  }
 #endif /* __OpenBSD__ */
 }
 
 void
 eunveil(const char *path, const char *permissions)
 {
-	(void)path;
-	(void)permissions;
+  (void)path;
+  (void)permissions;
 
 #ifdef __OpenBSD__
-	if (unveil(path, permissions) == -1) {
-		die("unveil:");
-	}
+  if (unveil(path, permissions) == -1) {
+    die("unveil:");
+  }
 #endif /* __OpenBSD__ */
 }
 
 int
 timestamp(char *buf, size_t len, time_t t)
 {
-	struct tm tm;
+  struct tm tm;
 
-	if (gmtime_r(&t, &tm) == NULL ||
-	    strftime(buf, len, "%a, %d %b %Y %T GMT", &tm) == 0) {
-		return 1;
-	}
+  if (gmtime_r(&t, &tm) == NULL ||
+      strftime(buf, len, "%a, %d %b %Y %T GMT", &tm) == 0) {
+    return 1;
+  }
 
-	return 0;
+  return 0;
 }
 
 int
 esnprintf(char *str, size_t size, const char *fmt, ...)
 {
-	va_list ap;
-	int ret;
+  va_list ap;
+  int ret;
 
-	va_start(ap, fmt);
-	ret = vsnprintf(str, size, fmt, ap);
-	va_end(ap);
+  va_start(ap, fmt);
+  ret = vsnprintf(str, size, fmt, ap);
+  va_end(ap);
 
-	return (ret < 0 || (size_t)ret >= size);
+  return (ret < 0 || (size_t)ret >= size);
 }
 
 int
 prepend(char *str, size_t size, const char *prefix)
 {
-	size_t len = strlen(str), prefixlen = strlen(prefix);
+  size_t len = strlen(str), prefixlen = strlen(prefix);
 
-	if (len + prefixlen + 1 > size) {
-		return 1;
-	}
+  if (len + prefixlen + 1 > size) {
+    return 1;
+  }
 
-	memmove(str + prefixlen, str, len + 1);
-	memcpy(str, prefix, prefixlen);
+  memmove(str + prefixlen, str, len + 1);
+  memcpy(str, prefix, prefixlen);
 
-	return 0;
+  return 0;
 }
 
 void
 html_escape(const char *src, char *dst, size_t dst_siz)
 {
-	const struct {
-		char c;
-		char *s;
-	} escape[] = {
-		{ '&',  "&amp;"  },
-		{ '<',  "&lt;"   },
-		{ '>',  "&gt;"   },
-		{ '"',  "&quot;" },
-		{ '\'', "&#x27;" },
-	};
-	size_t i, j, k, esclen;
+  const struct {
+    char c;
+    char *s;
+  } escape[] = {
+    { '&',  "&amp;"  },
+    { '<',  "&lt;"   },
+    { '>',  "&gt;"   },
+    { '"',  "&quot;" },
+    { '\'', "&#x27;" },
+  };
+  size_t i, j, k, esclen;
 
-	for (i = 0, j = 0; src[i] != '\0'; i++) {
-		for (k = 0; k < LEN(escape); k++) {
-			if (src[i] == escape[k].c) {
-				break;
-			}
-		}
-		if (k == LEN(escape)) {
-			/* no escape char at src[i] */
-			if (j == dst_siz - 1) {
-				/* silent truncation */
-				break;
-			} else {
-				dst[j++] = src[i];
-			}
-		} else {
-			/* escape char at src[i] */
-			esclen = strlen(escape[k].s);
+  for (i = 0, j = 0; src[i] != '\0'; i++) {
+    for (k = 0; k < LEN(escape); k++) {
+      if (src[i] == escape[k].c) {
+        break;
+      }
+    }
+    if (k == LEN(escape)) {
+      /* no escape char at src[i] */
+      if (j == dst_siz - 1) {
+        /* silent truncation */
+        break;
+      } else {
+        dst[j++] = src[i];
+      }
+    } else {
+      /* escape char at src[i] */
+      esclen = strlen(escape[k].s);
 
-			if (j >= dst_siz - esclen) {
-				/* silent truncation */
-				break;
-			} else {
-				memcpy(&dst[j], escape[k].s, esclen);
-				j += esclen;
-			}
-		}
-	}
-	dst[j] = '\0';
+      if (j >= dst_siz - esclen) {
+        /* silent truncation */
+        break;
+      } else {
+        memcpy(&dst[j], escape[k].s, esclen);
+        j += esclen;
+      }
+    }
+  }
+  dst[j] = '\0';
 }
 
-char*
-replace(const char *src, const char *old, const char* new) {
+void
+replace(char **src, const char *old, const char* new) {
   int old_len = strlen(old);
   int new_len = strlen(new);
-  int src_len = strlen(src);
+  int src_len = strlen(*src);
 
   /* Count needed replacements */
-  const char* tmp = src;
+  const char* tmp = *src;
   int replc=0;
   while ((tmp=strstr(tmp, old))) {
     replc++;
@@ -186,8 +186,8 @@ replace(const char *src, const char *old, const char* new) {
   char *buf = calloc( sizeof(char), src_len + replc*(abs(new_len-old_len)) + 1);
 
   /* Now start replacing */
-  const char *srcidx = src;
-  const char *srcidx_old = src;
+  const char *srcidx = *src;
+  const char *srcidx_old = *src;
   char *bufidx = buf;
 
   while (replc--) {
@@ -202,7 +202,56 @@ replace(const char *src, const char *old, const char* new) {
 
   strncpy(bufidx, srcidx, strlen(srcidx)); // copy tail
 
-  return buf;
+  free(*src);
+  *src = buf;
+}
+
+char*
+read_file(const char* path){
+  FILE* tpl_fp;
+
+  if (!(tpl_fp = fopen(path, "r"))) {
+    return NULL;
+  }
+
+  /* Get size of template */
+  if (fseek(tpl_fp, 0L, SEEK_END) < 0) {
+    fclose(tpl_fp);
+    return NULL;
+  }
+
+  long tpl_size;
+  if ((tpl_size = ftell(tpl_fp)) < 0) {
+    fclose(tpl_fp);
+    return NULL;
+  }
+
+  rewind(tpl_fp);
+
+  /* Read template into tpl_buf */
+  char* tpl_buf = (char*)calloc(sizeof(char), tpl_size);
+
+  if (tpl_buf == NULL) {
+    fclose(tpl_fp);
+    free(tpl_buf);
+    return NULL;
+  }
+
+  if (fread(tpl_buf, 1, tpl_size, tpl_fp) < tpl_size) {
+    if (feof(tpl_fp)) {
+      warn("Reached end of file %s prematurely", path);
+    } else if (ferror(tpl_fp)) {
+      warn("Error while reading file %s", path);
+    }
+
+    fclose(tpl_fp);
+    free(tpl_buf);
+    clearerr(tpl_fp);
+
+    return NULL;
+  }
+
+  return tpl_buf;
 }
 
 #define	INVALID  1
@@ -213,39 +262,39 @@ long long
 strtonum(const char *numstr, long long minval, long long maxval,
          const char **errstrp)
 {
-	long long ll = 0;
-	int error = 0;
-	char *ep;
-	struct errval {
-		const char *errstr;
-		int err;
-	} ev[4] = {
-		{ NULL,		0 },
-		{ "invalid",	EINVAL },
-		{ "too small",	ERANGE },
-		{ "too large",	ERANGE },
-	};
+  long long ll = 0;
+  int error = 0;
+  char *ep;
+  struct errval {
+    const char *errstr;
+    int err;
+  } ev[4] = {
+    { NULL,		0 },
+    { "invalid",	EINVAL },
+    { "too small",	ERANGE },
+    { "too large",	ERANGE },
+  };
 
-	ev[0].err = errno;
-	errno = 0;
-	if (minval > maxval) {
-		error = INVALID;
-	} else {
-		ll = strtoll(numstr, &ep, 10);
-		if (numstr == ep || *ep != '\0')
-			error = INVALID;
-		else if ((ll == LLONG_MIN && errno == ERANGE) || ll < minval)
-			error = TOOSMALL;
-		else if ((ll == LLONG_MAX && errno == ERANGE) || ll > maxval)
-			error = TOOLARGE;
-	}
-	if (errstrp != NULL)
-		*errstrp = ev[error].errstr;
-	errno = ev[error].err;
-	if (error)
-		ll = 0;
+  ev[0].err = errno;
+  errno = 0;
+  if (minval > maxval) {
+    error = INVALID;
+  } else {
+    ll = strtoll(numstr, &ep, 10);
+    if (numstr == ep || *ep != '\0')
+      error = INVALID;
+    else if ((ll == LLONG_MIN && errno == ERANGE) || ll < minval)
+      error = TOOSMALL;
+    else if ((ll == LLONG_MAX && errno == ERANGE) || ll > maxval)
+      error = TOOLARGE;
+  }
+  if (errstrp != NULL)
+    *errstrp = ev[error].errstr;
+  errno = ev[error].err;
+  if (error)
+    ll = 0;
 
-	return ll;
+  return ll;
 }
 
 /*
@@ -257,10 +306,10 @@ strtonum(const char *numstr, long long minval, long long maxval,
 void *
 reallocarray(void *optr, size_t nmemb, size_t size)
 {
-	if ((nmemb >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
-	    nmemb > 0 && SIZE_MAX / nmemb < size) {
-		errno = ENOMEM;
-		return NULL;
-	}
-	return realloc(optr, size * nmemb);
+  if ((nmemb >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
+      nmemb > 0 && SIZE_MAX / nmemb < size) {
+    errno = ENOMEM;
+    return NULL;
+  }
+  return realloc(optr, size * nmemb);
 }
