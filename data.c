@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #include "http.h"
-#include "resp.h"
+#include "data.h"
 #include "util.h"
 #include "dirl.h"
 
@@ -26,10 +26,68 @@ compareent(const struct dirent **d1, const struct dirent **d2)
 	return strcmp((*d1)->d_name, (*d2)->d_name);
 }
 
-enum status
-resp_dir(int fd, const struct response *res)
+static char *
+suffix(int t)
 {
-	enum status ret;
+	switch (t) {
+	case DT_FIFO: return "|";
+	case DT_DIR:  return "/";
+	case DT_LNK:  return "@";
+	case DT_SOCK: return "=";
+	}
+
+	return "";
+}
+
+static void
+html_escape(const char *src, char *dst, size_t dst_siz)
+{
+	const struct {
+		char c;
+		char *s;
+	} escape[] = {
+		{ '&',  "&amp;"  },
+		{ '<',  "&lt;"   },
+		{ '>',  "&gt;"   },
+		{ '"',  "&quot;" },
+		{ '\'', "&#x27;" },
+	};
+	size_t i, j, k, esclen;
+
+	for (i = 0, j = 0; src[i] != '\0'; i++) {
+		for (k = 0; k < LEN(escape); k++) {
+			if (src[i] == escape[k].c) {
+				break;
+			}
+		}
+		if (k == LEN(escape)) {
+			/* no escape char at src[i] */
+			if (j == dst_siz - 1) {
+				/* silent truncation */
+				break;
+			} else {
+				dst[j++] = src[i];
+			}
+		} else {
+			/* escape char at src[i] */
+			esclen = strlen(escape[k].s);
+
+			if (j >= dst_siz - esclen) {
+				/* silent truncation */
+				break;
+			} else {
+				memcpy(&dst[j], escape[k].s, esclen);
+				j += esclen;
+			}
+		}
+	}
+	dst[j] = '\0';
+}
+
+enum status
+data_send_dirlisting(int fd, const struct response *res)
+{
+	enum status ret = 0;
 	struct dirent **e;
 	size_t i;
 	int dirlen;
@@ -77,7 +135,22 @@ cleanup:
 }
 
 enum status
-resp_file(int fd, const struct response *res)
+data_send_error(int fd, const struct response *res)
+{
+	if (dprintf(fd,
+	            "<!DOCTYPE html>\n<html>\n\t<head>\n"
+	            "\t\t<title>%d %s</title>\n\t</head>\n\t<body>\n"
+	            "\t\t<h1>%d %s</h1>\n\t</body>\n</html>\n",
+	            res->status, status_str[res->status],
+		    res->status, status_str[res->status]) < 0) {
+		return S_REQUEST_TIMEOUT;
+	}
+
+	return 0;
+}
+
+enum status
+data_send_file(int fd, const struct response *res)
 {
 	FILE *fp;
 	enum status ret = 0;

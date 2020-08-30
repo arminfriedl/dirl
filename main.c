@@ -16,7 +16,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "resp.h"
+#include "data.h"
 #include "http.h"
 #include "sock.h"
 #include "util.h"
@@ -24,52 +24,57 @@
 static char *udsname;
 
 static void
-serve(int infd, const struct sockaddr_storage *in_sa, const struct server *srv)
+logmsg(const struct connection *c)
 {
-	struct connection c = { .fd = infd };
-	time_t t;
-	enum status status;
-	char inaddr[INET6_ADDRSTRLEN /* > INET_ADDRSTRLEN */];
+	char inaddr_str[INET6_ADDRSTRLEN /* > INET_ADDRSTRLEN */];
 	char tstmp[21];
 
+	/* create timestamp */
+	if (!strftime(tstmp, sizeof(tstmp), "%Y-%m-%dT%H:%M:%SZ",
+	              gmtime(&(time_t){time(NULL)}))) {
+		warn("strftime: Exceeded buffer capacity");
+		/* continue anyway (we accept the truncation) */
+	}
+
+	/* generate address-string */
+	if (sock_get_inaddr_str(&c->ia, inaddr_str, LEN(inaddr_str))) {
+		warn("sock_get_inaddr_str: Couldn't generate adress-string");
+		inaddr_str[0] = '\0';
+	}
+
+	printf("%s\t%s\t%d\t%s\t%s\n", tstmp, inaddr_str, c->res.status,
+	       c->req.field[REQ_HOST], c->req.uri);
+}
+
+static void
+serve(struct connection *c, const struct server *srv)
+{
+	enum status s;
+
 	/* set connection timeout */
-	if (sock_set_timeout(c.fd, 30)) {
+	if (sock_set_timeout(c->fd, 30)) {
 		goto cleanup;
 	}
 
 	/* handle request */
-	if ((status = http_recv_header(c.fd, c.header, LEN(c.header), &c.off)) ||
-	    (status = http_parse_header(c.header, &c.req)) ||
-	    (status = http_prepare_response(&c.req, &c.res, srv))) {
-		status = http_send_status(c.fd, status);
+	if ((s = http_recv_header(c->fd, c->header, LEN(c->header), &c->off)) ||
+	    (s = http_parse_header(c->header, &c->req))) {
+		http_prepare_error_response(&c->req, &c->res, s);
 	} else {
-		status = http_send_header(c.fd, &c.res);
-
-		/* send data */
-		if (c.res.type == RESTYPE_FILE) {
-			resp_file(c.fd, &c.res);
-		} else if (c.res.type == RESTYPE_DIRLISTING) {
-			resp_dir(c.fd, &c.res);
-		}
+		http_prepare_response(&c->req, &c->res, srv);
 	}
 
-	/* write output to log */
-	t = time(NULL);
-	if (!strftime(tstmp, sizeof(tstmp), "%Y-%m-%dT%H:%M:%SZ",
-	              gmtime(&t))) {
-		warn("strftime: Exceeded buffer capacity");
-		goto cleanup;
+	if ((s = http_send_header(c->fd, &c->res)) ||
+	    (s = http_send_body(c->fd, &c->res, &c->req))) {
+		c->res.status = s;
 	}
-	if (sock_get_inaddr_str(in_sa, inaddr, LEN(inaddr))) {
-		goto cleanup;
-	}
-	printf("%s\t%s\t%d\t%s\t%s\n", tstmp, inaddr, status,
-	       c.req.field[REQ_HOST], c.req.uri);
+
+	logmsg(c);
 cleanup:
 	/* clean up and finish */
-	shutdown(c.fd, SHUT_RD);
-	shutdown(c.fd, SHUT_WR);
-	close(c.fd);
+	shutdown(c->fd, SHUT_RD);
+	shutdown(c->fd, SHUT_WR);
+	close(c->fd);
 }
 
 static void
@@ -192,10 +197,8 @@ main(int argc, char *argv[])
 	struct server srv = {
 		.docindex = "index.html",
 	};
-	struct sockaddr_storage in_sa;
 	size_t i;
-	socklen_t in_sa_len;
-	int insock, status = 0, infd;
+	int insock, status = 0;
 	const char *err;
 	char *tok[4];
 
@@ -370,9 +373,10 @@ main(int argc, char *argv[])
 
 		/* accept incoming connections */
 		while (1) {
-			in_sa_len = sizeof(in_sa);
-			if ((infd = accept(insock, (struct sockaddr *)&in_sa,
-			                   &in_sa_len)) < 0) {
+			struct connection c = { 0 };
+
+			if ((c.fd = accept(insock, (struct sockaddr *)&c.ia,
+			                   &(socklen_t){sizeof(c.ia)})) < 0) {
 				warn("accept:");
 				continue;
 			}
@@ -380,7 +384,7 @@ main(int argc, char *argv[])
 			/* fork and handle */
 			switch (fork()) {
 			case 0:
-				serve(infd, &in_sa, &srv);
+				serve(&c, &srv);
 				exit(0);
 				break;
 			case -1:
@@ -388,7 +392,7 @@ main(int argc, char *argv[])
 				/* fallthrough */
 			default:
 				/* close the connection in the parent */
-				close(infd);
+				close(c.fd);
 			}
 		}
 		exit(0);
