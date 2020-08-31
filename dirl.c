@@ -86,12 +86,12 @@ html_escape(const char* src, char* dst, size_t dst_siz)
 static char*
 dirl_find_templ_dir(const char* start_path)
 {
-  char* path_buf = calloc(sizeof(char), strlen(start_path));
+  char* path_buf = calloc(sizeof(char), strlen(start_path)+1);
   strcat(path_buf, start_path);
 
-  if(strlen(path_buf) > 1 && path_buf[strlen(path_buf)-1] == '/') {
+  if (strlen(path_buf) > 1 && path_buf[strlen(path_buf) - 1] == '/') {
     // don't read last dir twice, except at root
-    path_buf[strlen(path_buf)-1] = '\0';
+    path_buf[strlen(path_buf) - 1] = '\0';
   }
 
   while (strlen(path_buf) != 0) {
@@ -100,8 +100,8 @@ dirl_find_templ_dir(const char* start_path)
     errno = 0;
     while ((de = readdir(cur))) {
       if (de->d_type == DT_REG) {
-        if (strcmp(DIRL_HEADER, de->d_name) || strcmp(DIRL_ENTRY, de->d_name) ||
-            strcmp(DIRL_FOOTER, de->d_name)) {
+        if (!strcmp(DIRL_HEADER, de->d_name) || !strcmp(DIRL_ENTRY, de->d_name) ||
+            !strcmp(DIRL_FOOTER, de->d_name)) {
           closedir(cur);
           return path_buf;
         }
@@ -112,7 +112,7 @@ dirl_find_templ_dir(const char* start_path)
       char* parent = strrchr(path_buf, '/');
       (*parent) = '\0'; // strip tail from path_buf
 
-      if(strlen(path_buf) == 0) { // we stripped root, let it loop once more
+      if (strlen(path_buf) == 0) { // we stripped root, let it loop once more
         path_buf[0] = '/';
         path_buf[1] = '\0';
       }
@@ -168,8 +168,8 @@ enum status
 dirl_header(int fd, const struct response* res, const struct dirl_templ* templ)
 {
   /* Replace placeholder */
-  char* nhead = calloc(sizeof(char), strlen(templ->header)+1);
-  memcpy(nhead, templ->header, strlen(templ->header)+1);
+  char* nhead = calloc(sizeof(char), strlen(templ->header) + 1);
+  memcpy(nhead, templ->header, strlen(templ->header) + 1);
   replace(&nhead, "{uri}", res->uri);
 
   /* Write header */
@@ -182,24 +182,29 @@ dirl_header(int fd, const struct response* res, const struct dirl_templ* templ)
 }
 
 enum status
-dirl_entry(int fd, const struct dirent* entry, const struct dirl_templ* templ)
+dirl_entry(int fd,
+           const struct dirent* entry,
+           const struct response* res,
+           const struct dirl_templ* templ)
 {
   struct stat stat_buf;
-  lstat(entry->d_name, &stat_buf);
+  char* path_buf = calloc(sizeof(char), strlen(res->path)+strlen(entry->d_name));
+  strcat(path_buf, res->path);
+  strcat(path_buf, entry->d_name);
+  lstat(path_buf, &stat_buf);
 
-  char* nentry = calloc(sizeof(char), strlen(templ->entry)+1);
-  //strcat(nentry, templ->entry);
-  memcpy(nentry, templ->entry, strlen(templ->entry)+1);
+  char* nentry = calloc(sizeof(char), strlen(templ->entry) + 1);
+  memcpy(nentry, templ->entry, strlen(templ->entry) + 1);
 
   /* Replace placeholder */
   char esc[PATH_MAX * 6];
-  html_escape(entry->d_name, esc, PATH_MAX*6);
+  html_escape(entry->d_name, esc, PATH_MAX * 6);
   replace(&nentry, "{entry}", entry->d_name);
 
   replace(&nentry, "{suffix}", suffix(entry->d_type));
 
   char size_buf[1024];
-  if(entry->d_type == DT_REG) {
+  if (entry->d_type == DT_REG) {
     snprintf(size_buf, 1024, "%ld", stat_buf.st_size);
   } else {
     sprintf(size_buf, "-");
@@ -224,8 +229,8 @@ enum status
 dirl_footer(int fd, const struct dirl_templ* templ)
 {
   /* Replace placeholder */
-  char* nfoot = calloc(sizeof(char), strlen(templ->footer)+1);
-  memcpy(nfoot, templ->footer, strlen(templ->footer)+1);
+  char* nfoot = calloc(sizeof(char), strlen(templ->footer) + 1);
+  memcpy(nfoot, templ->footer, strlen(templ->footer) + 1);
 
   /* Write footer */
   write(fd, nfoot, strlen(nfoot));

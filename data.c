@@ -55,7 +55,7 @@ data_send_dirlisting(int fd, const struct response *res)
     }
 
     /* entry line */
-    if ((ret = dirl_entry(fd, e[i], &templates))) {
+    if ((ret = dirl_entry(fd, e[i], res, &templates))) {
       goto cleanup;
     }
 

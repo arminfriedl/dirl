@@ -82,7 +82,7 @@ dirl_header(int, const struct response*, const struct dirl_templ*);
 
 /* Print entry into the response */
 enum status
-dirl_entry(int, const struct dirent*, const struct dirl_templ*);
+dirl_entry(int, const struct dirent*, const struct response*, const struct dirl_templ*);
 
 /* Print footer into the response */
 enum status
