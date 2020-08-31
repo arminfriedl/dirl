@@ -5,6 +5,22 @@ found at https://git.suckless.org/quark.
 
 Quark is a small http server.
 
+# Feature Patches
+
+## Dirl: Customizable directory listing
+[dirl](https://git.friedl.net/playground/suckless-quark/src/branch/dirlist) lets
+you serve a fully customizable directory listing.
+
+You can compile `dirl` from the `dirlist` branch, download a pre-compiled [musl
+binary](https://dirlist.friedl.net/bin/suckless/quark/quark-dirl) or even pull a
+pre-made [docker
+image](https://hub.docker.com/repository/docker/arminfriedl/quark).
+
+You can find an example deployment of [here](https://dirlist.friedl.net/). It
+uses the default template just with a custom css. You can define your own
+templates too for full customization. For details see the dirl
+[README.md](https://git.friedl.net/playground/suckless-quark/src/branch/dirlist/README.md).
+
 # Issues
 
 ## fork: Resource temporarily unavailable
