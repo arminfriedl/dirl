@@ -189,7 +189,7 @@ dirl_entry(int fd,
 {
   struct stat stat_buf;
   char* path_buf = calloc(sizeof(char), strlen(res->path)+strlen(entry->d_name));
-  strcat(path_buf, res->path);
+  strcat(path_buf, res->uri);
   strcat(path_buf, entry->d_name);
   lstat(path_buf, &stat_buf);
 
