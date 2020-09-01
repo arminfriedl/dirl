@@ -52,6 +52,8 @@ void eunveil(const char *, const char *);
 int timestamp(char *, size_t, time_t);
 int esnprintf(char *, size_t, const char *, ...);
 int prepend(char *, size_t, const char *);
+void replace(char **, const char *, const char *);
+char *read_file(const char* path);
 
 void *reallocarray(void *, size_t, size_t);
 long long strtonum(const char *, long long, long long, const char **);

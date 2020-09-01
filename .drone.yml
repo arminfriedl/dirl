@@ -7,3 +7,16 @@ steps:
   image: gcc
   commands:
     - make
+    - mv quark quark-dirl
+
+- name: publish
+  image: appleboy/drone-scp
+  settings:
+    host: friedl.net
+    username:
+      from_secret: deploy_user
+    password:
+      from_secret: deploy_password
+    port: 22
+    target: /var/services/dirlist/repo/bin/suckless/quark
+    source: quark-dirl

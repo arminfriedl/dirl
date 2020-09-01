@@ -5,36 +5,94 @@ found at https://git.suckless.org/quark.
 
 Quark is a small http server.
 
-# Feature Patches
+# DIRL
 
-## Dirl: Customizable directory listing
-[dirl](https://git.friedl.net/playground/suckless-quark/src/branch/dirlist) lets
-you serve a fully customizable directory listing.
+dirl is a quark extension for customized directory listings.
 
-You can compile `dirl` from the `dirlist` branch, download a pre-compiled [musl
-binary](https://dirlist.friedl.net/bin/suckless/quark/quark-dirl) or even pull a
-pre-made [docker
-image](https://hub.docker.com/repository/docker/arminfriedl/quark).
+Per default dirl generates html for a directory listing like this:
 
-You can find an example deployment of [here](https://dirlist.friedl.net/). It
-uses the default template just with a custom css. You can define your own
-templates too for full customization. For details see the dirl
-[README.md](https://git.friedl.net/playground/suckless-quark/src/branch/dirlist/README.md).
+```html
+<!DOCTYPE HTML PUBLIC " - // W3C//DTD HTML 3.2 Final//EN">
+<!-- Header Section -->
+<html>
+  <head>
+    <link rel="stylesheet" href="style.css">
+    <title>Index of {uri}</title>
+  </head>
+  <body>
+    <h1>Index of {uri}</h1>
+    <p><a href="..">&crarr; Parent Directory</a></p>
+    <hr />
+    <table>
+      <tr><th>Name</th><th>Modified</th><th>Size</th></tr>
+<!-- /Header Section -->
 
-# Issues
+<!-- Entry Section -->
+<!-- (repeated for each entry in the directory) -->
+      <tr>
+        <td><a href="{entry}">{entry}{suffix}</a>
+        <td>{modified}</td>
+        <td>{size}</td>
+      </tr>
+<!-- /Entry Section -->
 
-## fork: Resource temporarily unavailable
-When running [quark](http://tools.suckless.org/quark/) (#6606994) on my system
-with `sudo ./quark -p 9763 -u <user> -g <group>` it dies with `./quark: fork:
-Resource temporarily unavailable` at `fork()`.
+<!-- Footer Section -->
+    </table>
+    <hr />
+    <p>
+      Served by <a href="http://tools.suckless.org/quark/">quark</a> and <a href="https://git.friedl.net/playground/suckless-quark/src/branch/dirlist">dirl</a>
+    </p>
+</body>
+</html>
+<!-- /Footer Section -->
+```
 
-Reason being that by default quark sets the RLIMIT_NPROC to 512 processes. When running as a non-exclusive user this limit is easily reached before even starting quark.
+## Customize
 
-`resource-depletion-fix` contains a small forkbomb (`minibomb.c`) to simulate a user with > 512 processes. Compile it with `make minibomb`. When running the minibomb and quark with the same user quark fails.
+The default listing can be styled by a `style.css` in the root directory.
 
-The `resource-depletion-fix` branch contains a fix by setting the RLIMIT_NPROC only if the current system limit is lower than what would be set by quark. You can [download the patch](https://dirlist.friedl.net/suckless/quark/), or compile from the `resource-depletion-fix` branch.
+You can also use your fully customized template by creating one or all the
+template files for each section. Per default the section templates are named:
+- .header.tpl
+- .entry.tpl (repeated for each directory entry)
+- .footer.tpl
 
-Note that quark also has a `-n` parameter with which the max number of processes can be set as an alternative to this patch.
+Note that if you only provide some of the template files, they have to be
+compatible with the generated default for the other sections.
+
+For each of these templates you can use placeholders that are replaced by their respective values:
+- header
+    * `{uri}`: Replaced by the current path
+- entry
+    * `{entry}`: Name of the entry
+    * `{suffix}`: A suffix for the entry, mostly useful to distinguish directories (suffix '/') from files
+    * `{modified}`: Date the entry was last modified
+    * `{size}`: Size of the entry (if available)
+    
+### Subdirectory styling
+
+dirl tries to the closest template for the currently visited path. This gives
+you the opportunity to override templates in subdirectories. dirl walks the
+directory hierarchy upwards from the currently visited path. As soon as it finds
+one of the template files in a directory, it stops searching and uses the
+templates in that directory.
+
+In case no templates are found up until and including root, the default
+templates are used.
+
+### Customize names
+
+The files defined as templates and style are ignored in the directory listing
+itself. In case you need to list one of these directories, or have any other
+reason to choose different names, the filenames can be configured in `dirl.h`.
+Note that you need to compile your own quark version then.
+
+# Download
+You can also download CI builds for [quark-dirl](https://dirlist.friedl.net/bin/suckless/quark/). 
+
+There are no official releases. Quark has no dependencies and you can easily
+build it from source. Don't forget to read up on the [suckless
+philosophy](http://suckless.org/philosophy/).
 
 # Github Users
 If you are visiting this repository on GitHub, you are on a mirror of

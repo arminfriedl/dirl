@@ -4,11 +4,12 @@
 
 include config.mk
 
-COMPONENTS = data http sock util
+COMPONENTS = data http sock util dirl
 
 all: quark
 
-data.o: data.c data.h util.h http.h config.mk
+data.o: data.c data.h util.h http.h dirl.h config.mk
+dirl.o: dirl.c dirl.h util.h http.h config.mk
 http.o: http.c http.h util.h http.h data.h config.h config.mk
 main.o: main.c util.h sock.h http.h arg.h config.h config.mk
 sock.o: sock.c sock.h util.h config.mk

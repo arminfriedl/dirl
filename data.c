@@ -10,6 +10,7 @@
 #include "http.h"
 #include "data.h"
 #include "util.h"
+#include "dirl.h"
 
 static int
 compareent(const struct dirent **d1, const struct dirent **d2)
@@ -25,64 +26,6 @@ compareent(const struct dirent **d1, const struct dirent **d2)
 	return strcmp((*d1)->d_name, (*d2)->d_name);
 }
 
-static char *
-suffix(int t)
-{
-	switch (t) {
-	case DT_FIFO: return "|";
-	case DT_DIR:  return "/";
-	case DT_LNK:  return "@";
-	case DT_SOCK: return "=";
-	}
-
-	return "";
-}
-
-static void
-html_escape(const char *src, char *dst, size_t dst_siz)
-{
-	const struct {
-		char c;
-		char *s;
-	} escape[] = {
-		{ '&',  "&amp;"  },
-		{ '<',  "&lt;"   },
-		{ '>',  "&gt;"   },
-		{ '"',  "&quot;" },
-		{ '\'', "&#x27;" },
-	};
-	size_t i, j, k, esclen;
-
-	for (i = 0, j = 0; src[i] != '\0'; i++) {
-		for (k = 0; k < LEN(escape); k++) {
-			if (src[i] == escape[k].c) {
-				break;
-			}
-		}
-		if (k == LEN(escape)) {
-			/* no escape char at src[i] */
-			if (j == dst_siz - 1) {
-				/* silent truncation */
-				break;
-			} else {
-				dst[j++] = src[i];
-			}
-		} else {
-			/* escape char at src[i] */
-			esclen = strlen(escape[k].s);
-
-			if (j >= dst_siz - esclen) {
-				/* silent truncation */
-				break;
-			} else {
-				memcpy(&dst[j], escape[k].s, esclen);
-				j += esclen;
-			}
-		}
-	}
-	dst[j] = '\0';
-}
-
 enum status
 data_send_dirlisting(int fd, const struct response *res)
 {
@@ -90,48 +33,38 @@ data_send_dirlisting(int fd, const struct response *res)
 	struct dirent **e;
 	size_t i;
 	int dirlen;
-	char esc[PATH_MAX /* > NAME_MAX */ * 6]; /* strlen("&...;") <= 6 */
 
 	/* read directory */
 	if ((dirlen = scandir(res->path, &e, NULL, compareent)) < 0) {
 		return S_FORBIDDEN;
 	}
 
-	/* listing header (we use esc because sizeof(esc) >= PATH_MAX) */
-	html_escape(res->uri, esc, MIN(PATH_MAX, sizeof(esc)));
-	if (dprintf(fd,
-	            "<!DOCTYPE html>\n<html>\n\t<head>"
-	            "<title>Index of %s</title></head>\n"
-	            "\t<body>\n\t\t<a href=\"..\">..</a>",
-	            esc) < 0) {
-		ret = S_REQUEST_TIMEOUT;
-		goto cleanup;
-	}
+  /* read templates */
+  struct dirl_templ templates = dirl_read_templ(res->uri);
 
-	/* listing */
+  /* listing header */
+  if ((ret = dirl_header(fd, res, &templates))) {
+    return ret;
+  }
+
+	/* entries */
 	for (i = 0; i < (size_t)dirlen; i++) {
-		/* skip hidden files, "." and ".." */
-		if (e[i]->d_name[0] == '.') {
-			continue;
-		}
+    /*  skip dirl special files */
+    if(dirl_skip(e[i]->d_name)) {
+      continue;
+    }
 
-		/* entry line */
-		html_escape(e[i]->d_name, esc, sizeof(esc));
-		if (dprintf(fd, "<br />\n\t\t<a href=\"%s%s\">%s%s</a>",
-		            esc,
-		            (e[i]->d_type == DT_DIR) ? "/" : "",
-		            esc,
-		            suffix(e[i]->d_type)) < 0) {
-			ret = S_REQUEST_TIMEOUT;
-			goto cleanup;
-		}
+    /* entry line */
+    if ((ret = dirl_entry(fd, e[i], res, &templates))) {
+      goto cleanup;
+    }
+
 	}
 
-	/* listing footer */
-	if (dprintf(fd, "\n\t</body>\n</html>\n") < 0) {
-		ret = S_REQUEST_TIMEOUT;
-		goto cleanup;
-	}
+  /* listing footer */
+  if ((ret = dirl_footer(fd, &templates))) {
+    goto cleanup;
+  }
 
 cleanup:
 	while (dirlen--) {
