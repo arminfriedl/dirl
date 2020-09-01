@@ -41,15 +41,8 @@
 #define DIRL_FOOTER_DEFAULT                                                    \
   "    </table>\n"                                                             \
   "    <hr />\n"                                                               \
-  "    <p>"                                                                    \
-  "Served by"                                                                  \
-  " <a href=\"http://tools.suckless.org/quark/\">quark</a>"                    \
-  " and"                                                                       \
-  " <a href="                                                                  \
-  "\"https://git.friedl.net/playground/suckless-quark/src/branch/dirlist\">"   \
-  "dirl"                                                                       \
-  "</a>"                                                                       \
-  "</p>\n"                                                                     \
+  "    <p>Served by <a href=\"http://git.friedl.net/incubator/dirl\">dirl</a>" \
+  "    </p>\n"                                                                 \
   "</body>\n"                                                                  \
   "</html>"
 
