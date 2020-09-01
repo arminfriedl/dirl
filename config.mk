@@ -1,4 +1,4 @@
-# quark version
+# dirl version
 VERSION = 0
 
 # Customize below to fit your system
@@ -9,7 +9,7 @@ MANPREFIX = $(PREFIX)/share/man
 
 # flags
 CPPFLAGS = -DVERSION=\"$(VERSION)\" -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=700 -D_BSD_SOURCE
-CFLAGS   = -std=c99 -pedantic -Wall -Wextra -Os
+CFLAGS   = -std=c99 -pedantic -Wall -Wextra -Os $(STATIC)
 LDFLAGS  = -s
 
 # compiler and linker

@@ -3,13 +3,20 @@ type: docker
 name: default
 
 steps:
-- name: build
+- name: glibc-x86_64
   image: gcc
   commands:
     - make
-    - mv quark quark-dirl
+    - mv dirl dirl-glibc-x86_64
 
-- name: publish
+- name: musl-x86_64
+  image: alpine
+  commands:
+    - apk update && apk add make git build-base linux-headers musl-dev
+    - make STATIC="-static -fPIE"
+    - mv dirl dirl-musl-x86_64
+
+- name: publish binaries
   image: appleboy/drone-scp
   settings:
     host: friedl.net
@@ -18,5 +25,19 @@ steps:
     password:
       from_secret: deploy_password
     port: 22
-    target: /var/services/dirlist/repo/bin/suckless/quark
-    source: quark-dirl
+    target: /var/services/dirlist/repo/bin/dirl
+    source:
+      - dirl-glibc-x86_64
+      - dirl-musl-x86_64
+
+- name: publish-container
+  image: plugins/docker
+  settings:
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+    dockerfile: Dockerfile
+    purge: true
+    repo: arminfriedl/dirl
+    tags: latest

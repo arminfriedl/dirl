@@ -1,15 +1,20 @@
-[![Build Status](https://drone.friedl.net/api/badges/playground/suckless-quark/status.svg)](https://drone.friedl.net/playground/suckless-quark)
+[![Build Status](https://drone.friedl.net/api/badges/incubator/dirl/status.svg)](https://drone.friedl.net/incubator/dirl)
 
-This is my private tree of [quark](tools.suckless.org/quark/). Upstream can be
-found at https://git.suckless.org/quark.
+Dirl is a tiny server for customized directory listings. It is based on
+[quark](tools.suckless.org/quark/).
 
-Quark is a small http server.
+# Getting Started
+Pre-built binaries linked against glibc and musl can be downloaded from
+[https://dirlist.friedl.net](https://dirlist.friedl.net/bin/dirl).
 
-# DIRL
+In addition alpine based docker images are provided at
+[DockerHub](https://hub.docker.com/repository/docker/arminfriedl/dirl).
 
-dirl is a quark extension for customized directory listings.
+To start a directory listing just run the binary or start a container.
 
-Per default dirl generates html for a directory listing like this:
+# Defaults
+Per default dirl generates standard compliant html for a directory listing like
+this:
 
 ```html
 <!DOCTYPE HTML PUBLIC " - // W3C//DTD HTML 3.2 Final//EN">
@@ -47,7 +52,7 @@ Per default dirl generates html for a directory listing like this:
 <!-- /Footer Section -->
 ```
 
-## Customize
+# Customization
 
 The default listing can be styled by a `style.css` in the root directory.
 
@@ -69,7 +74,7 @@ For each of these templates you can use placeholders that are replaced by their 
     * `{modified}`: Date the entry was last modified
     * `{size}`: Size of the entry (if available)
     
-### Subdirectory styling
+## Subdirectory styling
 
 dirl tries to the closest template for the currently visited path. This gives
 you the opportunity to override templates in subdirectories. dirl walks the
@@ -80,7 +85,7 @@ templates in that directory.
 In case no templates are found up until and including root, the default
 templates are used.
 
-### Customize names
+## Customize names
 
 The files defined as templates and style are ignored in the directory listing
 itself. In case you need to list one of these directories, or have any other
