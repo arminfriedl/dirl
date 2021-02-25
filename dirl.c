@@ -246,5 +246,6 @@ dirl_skip(const char* name)
          || !strcmp(name, DIRL_HEADER) //
          || !strcmp(name, DIRL_ENTRY)  //
          || !strcmp(name, DIRL_FOOTER) //
-         || !strcmp(name, DIRL_STYLE); //
+         || !strcmp(name, DIRL_STYLE)  //
+         || !strcmp(name, FAVICON);    //
 }

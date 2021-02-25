@@ -9,9 +9,10 @@
 #include "http.h"
 
 #define DIRL_HEADER ".header.tpl"
-#define DIRL_ENTRY ".entry.tpl"
+#define DIRL_ENTRY  ".entry.tpl"
 #define DIRL_FOOTER ".footer.tpl"
-#define DIRL_STYLE "style.css"
+#define DIRL_STYLE  "style.css"
+#define FAVICON     "favicon.ico"
 
 /* Default template definitions
  *

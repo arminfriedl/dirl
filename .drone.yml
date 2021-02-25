@@ -6,14 +6,14 @@ steps:
 - name: glibc-x86_64
   image: gcc
   commands:
-    - make clean && make all
+    - make clean && make CFLAGS=-O3 all
     - mv dirl dirl-glibc-x86_64
 
 - name: musl-x86_64
   image: alpine
   commands:
     - apk update && apk add make git build-base linux-headers musl-dev
-    - make clean && make STATIC=-static all
+    - make clean && make CFLAGS="-static -O3" all
     - mv dirl dirl-musl-x86_64
 
 - name: publish binaries
