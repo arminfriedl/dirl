@@ -8,7 +8,7 @@ Pre-built binaries linked against glibc and musl can be downloaded from
 [https://dirlist.friedl.net](https://dirlist.friedl.net/bin/dirl).
 
 In addition alpine based docker images are provided at
-[DockerHub](https://hub.docker.com/repository/docker/arminfriedl/dirl).
+[arminfriedl/dirl](https://hub.docker.com/r/arminfriedl/dirl) on DockerHub.
 
 To start a directory listing just run the binary or start a container.
 
@@ -107,7 +107,7 @@ other GitHub mirrors.
 Like with my other incubator projects, once I consider `dirl` reasonable stable
 the main tree will move on GitHub.
 
-Dirl is built upon [quark](tools.suckless.org/quark/). You are welcome to pull
+Dirl is built upon [quark](https://tools.suckless.org/quark/). You are welcome to pull
 any changes from this repository into your own quark tree. If you want to
 contribute consider [contributing](http://suckless.org/hacking/) directly to
 [upstream](http://suckless.org/community/).
